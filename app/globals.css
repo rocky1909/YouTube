@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 900px at 8% -10%, rgba(63, 136, 197, 0.28), transparent 65%),
+    radial-gradient(1000px 700px at 95% 10%, rgba(239, 131, 84, 0.18), transparent 55%),
+    radial-gradient(700px 500px at 35% 95%, rgba(63, 108, 81, 0.2), transparent 65%),
+    #070b1a;
+  color: #f3f1eb;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-shell {
+  width: min(1200px, calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+.glass-card {
+  border: 1px solid rgba(243, 241, 235, 0.14);
+  background: linear-gradient(
+    160deg,
+    rgba(243, 241, 235, 0.08),
+    rgba(243, 241, 235, 0.03)
+  );
+  box-shadow:
+    0 24px 48px rgba(2, 8, 24, 0.35),
+    inset 0 1px 0 rgba(243, 241, 235, 0.08);
+}
+
+.pulse-dot {
+  position: relative;
+}
+
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  opacity: 0.45;
+  animation: pulse-ring 1.8s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.5;
+  }
+  75% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
