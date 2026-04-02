@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const project = await createProjectForUserWorkspace(user, parsed.data);
+    const project = await createProjectForUserWorkspace(supabase, user, parsed.data);
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

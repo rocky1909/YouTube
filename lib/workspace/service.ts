@@ -1,6 +1,5 @@
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { AgentResult } from "@/lib/types";
-import { getSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
 export type ProjectSummary = {
   id: string;
@@ -20,8 +19,10 @@ export type WorkspaceContext = {
   projects: ProjectSummary[];
 };
 
-export async function getOrCreateWorkspaceContext(user: Pick<User, "id" | "email">): Promise<WorkspaceContext> {
-  const supabase = getSupabaseServiceRoleClient();
+export async function getOrCreateWorkspaceContext(
+  supabase: SupabaseClient,
+  user: Pick<User, "id" | "email">
+): Promise<WorkspaceContext> {
   const email = user.email ?? null;
 
   await supabase.from("profiles").upsert(
@@ -105,6 +106,7 @@ export async function getOrCreateWorkspaceContext(user: Pick<User, "id" | "email
 }
 
 export async function createProjectForUserWorkspace(
+  supabase: SupabaseClient,
   user: Pick<User, "id" | "email">,
   input: {
     title: string;
@@ -114,8 +116,7 @@ export async function createProjectForUserWorkspace(
     durationMinutes: number;
   }
 ) {
-  const supabase = getSupabaseServiceRoleClient();
-  const context = await getOrCreateWorkspaceContext(user);
+  const context = await getOrCreateWorkspaceContext(supabase, user);
 
   const result = await supabase
     .from("projects")
@@ -138,8 +139,7 @@ export async function createProjectForUserWorkspace(
   return result.data as ProjectSummary;
 }
 
-export async function assertUserCanAccessProject(userId: string, projectId: string) {
-  const supabase = getSupabaseServiceRoleClient();
+export async function assertUserCanAccessProject(supabase: SupabaseClient, userId: string, projectId: string) {
   const project = await supabase.from("projects").select("workspace_id").eq("id", projectId).maybeSingle();
   if (project.error || !project.data) {
     throw new Error(project.error?.message ?? "Project not found.");
@@ -157,9 +157,8 @@ export async function assertUserCanAccessProject(userId: string, projectId: stri
   }
 }
 
-export async function persistAgentSteps(projectId: string, steps: AgentResult[]) {
+export async function persistAgentSteps(supabase: SupabaseClient, projectId: string, steps: AgentResult[]) {
   if (steps.length === 0) return;
-  const supabase = getSupabaseServiceRoleClient();
 
   const inserts = steps.map((step) => ({
     project_id: projectId,

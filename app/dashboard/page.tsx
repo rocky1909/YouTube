@@ -21,6 +21,7 @@ export default async function DashboardPage() {
         }>;
       }
     | undefined;
+  let workspaceLoadError: string | null = null;
 
   if (isSupabaseConfigured()) {
     const supabase = await createSupabaseServerClient();
@@ -30,16 +31,20 @@ export default async function DashboardPage() {
       redirect("/auth/login");
     }
 
-    const context = await getOrCreateWorkspaceContext({
-      id: user.id,
-      email: user.email ?? ""
-    });
+    try {
+      const context = await getOrCreateWorkspaceContext(supabase, {
+        id: user.id,
+        email: user.email ?? ""
+      });
 
-    workspaceContext = {
-      workspaceName: context.workspaceName,
-      userEmail: user.email ?? "creator",
-      projects: context.projects
-    };
+      workspaceContext = {
+        workspaceName: context.workspaceName,
+        userEmail: user.email ?? "creator",
+        projects: context.projects
+      };
+    } catch (error) {
+      workspaceLoadError = error instanceof Error ? error.message : "Failed to load workspace data.";
+    }
   }
 
   return (
@@ -57,6 +62,8 @@ export default async function DashboardPage() {
           <p className="mt-3 text-sm text-lagoon/90">
             Signed in as {workspaceContext.userEmail} in workspace &quot;{workspaceContext.workspaceName}&quot;.
           </p>
+        ) : workspaceLoadError ? (
+          <p className="mt-3 text-sm text-coral/90">{workspaceLoadError}</p>
         ) : (
           <p className="mt-3 text-sm text-coral/90">
             Supabase not configured yet. Dashboard is running in standalone mode.

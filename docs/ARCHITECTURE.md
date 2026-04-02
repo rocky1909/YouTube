@@ -6,7 +6,7 @@
 - Domain layer: `lib/agents/*`
 - Validation: Zod schemas in `lib/types.ts`
 - Auth + sessions: Supabase auth routes + server cookie client
-- Team data: Supabase service-role workspace/project persistence
+- Team data: Supabase authenticated session workspace/project persistence
 
 ## Why this fixes the missing part
 The earlier prototype pattern often fails by putting everything in one client file. This repo now separates:

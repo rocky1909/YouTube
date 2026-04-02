@@ -75,6 +75,8 @@ When `projectId` is provided and the user is authenticated, agent steps are save
 Required for auth/workspaces:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+Optional Supabase admin key:
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 Optional for real provider generation:

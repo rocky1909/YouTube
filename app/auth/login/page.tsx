@@ -11,8 +11,8 @@ export default async function LoginPage() {
           <p className="text-xs uppercase tracking-[0.2em] text-paper/55">Setup Required</p>
           <h1 className="mt-2 text-3xl font-semibold text-paper">Supabase env vars are missing</h1>
           <p className="mt-3 text-paper/75">
-            Add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to
-            enable auth and team workspace features.
+            Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to enable auth and team workspace
+            features.
           </p>
         </section>
       </main>

@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     return parsed.response;
   }
 
-  let authenticatedUserId: string | null = null;
+  let workspaceSupabaseClient: Awaited<ReturnType<typeof createSupabaseServerClient>> | null = null;
   if (parsed.data.projectId) {
     if (!isSupabaseConfigured()) {
       return NextResponse.json(
@@ -22,16 +22,16 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createSupabaseServerClient();
+    workspaceSupabaseClient = supabase;
     const authResult = await supabase.auth.getUser();
     const user = authResult.data.user;
 
     if (!user) {
       return NextResponse.json({ error: "Authentication required to save pipeline runs." }, { status: 401 });
     }
-    authenticatedUserId = user.id;
 
     try {
-      await assertUserCanAccessProject(user.id, parsed.data.projectId);
+      await assertUserCanAccessProject(supabase, user.id, parsed.data.projectId);
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "You do not have access to this project." },
@@ -42,9 +42,9 @@ export async function POST(request: Request) {
 
   const result = await runFullPipeline(parsed.data.brief);
 
-  if (parsed.data.projectId && authenticatedUserId) {
+  if (parsed.data.projectId && workspaceSupabaseClient) {
     try {
-      await persistAgentSteps(parsed.data.projectId, result.steps);
+      await persistAgentSteps(workspaceSupabaseClient, parsed.data.projectId, result.steps);
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Failed to persist pipeline run." },
