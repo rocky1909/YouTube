@@ -42,7 +42,14 @@ function fallbackWorkspaceName(email: string | null | undefined): string {
 function shouldUseMetadataFallback(error: SupabaseLikeError): boolean {
   if (!error) return false;
   const message = (error.message ?? "").toLowerCase();
-  return error.code === "42P01" || error.code === "42501" || message.includes("does not exist");
+  return (
+    error.code === "42P01" ||
+    error.code === "42501" ||
+    error.code === "PGRST205" ||
+    message.includes("does not exist") ||
+    message.includes("could not find the table") ||
+    message.includes("schema cache")
+  );
 }
 
 function asObject(value: unknown): Record<string, unknown> {
