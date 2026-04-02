@@ -2,6 +2,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import type { AgentResult, BriefInput } from "@/lib/types";
 import type { AgentProvider } from "@/lib/agents/provider";
+import type { ProviderKeys } from "@/lib/provider-keys";
 
 const promptPayloadSchema = z.object({
   titleOptions: z.array(z.string()).min(1),
@@ -76,8 +77,22 @@ async function readChatContent(response: Response): Promise<string> {
 }
 
 export class RealAgentProvider implements AgentProvider {
+  constructor(private readonly providerKeys?: ProviderKeys) {}
+
+  private getOpenAIKey() {
+    return this.providerKeys?.openaiApiKey ?? env.OPENAI_API_KEY;
+  }
+
+  private getElevenLabsKey() {
+    return this.providerKeys?.elevenLabsApiKey ?? env.ELEVENLABS_API_KEY;
+  }
+
+  private getRunwayKey() {
+    return this.providerKeys?.runwayApiKey ?? env.RUNWAY_API_KEY;
+  }
+
   private ensureOpenAIKey() {
-    if (!env.OPENAI_API_KEY) {
+    if (!this.getOpenAIKey()) {
       throw new Error("OPENAI_API_KEY is required for real text/image generation.");
     }
   }
@@ -92,10 +107,11 @@ export class RealAgentProvider implements AgentProvider {
     schema: z.ZodSchema<T>;
   }): Promise<T> {
     this.ensureOpenAIKey();
+    const openAIKey = this.getOpenAIKey() as string;
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAIKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -160,10 +176,11 @@ Produce a scene-friendly script structure with practical pacing.`,
 
   private async generateImageURL(prompt: string): Promise<string | null> {
     this.ensureOpenAIKey();
+    const openAIKey = this.getOpenAIKey() as string;
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAIKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -219,10 +236,11 @@ Produce a scene-friendly script structure with practical pacing.`,
 
   private async openAITTS(text: string): Promise<string> {
     this.ensureOpenAIKey();
+    const openAIKey = this.getOpenAIKey() as string;
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAIKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -243,7 +261,8 @@ Produce a scene-friendly script structure with practical pacing.`,
   }
 
   private async elevenLabsTTS(text: string): Promise<string> {
-    if (!env.ELEVENLABS_API_KEY) {
+    const elevenLabsKey = this.getElevenLabsKey();
+    if (!elevenLabsKey) {
       throw new Error("ELEVENLABS_API_KEY missing.");
     }
 
@@ -252,7 +271,7 @@ Produce a scene-friendly script structure with practical pacing.`,
       {
         method: "POST",
         headers: {
-          "xi-api-key": env.ELEVENLABS_API_KEY,
+          "xi-api-key": elevenLabsKey,
           "Content-Type": "application/json",
           Accept: "audio/mpeg"
         },
@@ -281,7 +300,7 @@ Produce a scene-friendly script structure with practical pacing.`,
     const script = source.length > 0 ? source : "Voiceover draft unavailable.";
     const shortScript = script.slice(0, 700);
 
-    if (env.ELEVENLABS_API_KEY) {
+    if (this.getElevenLabsKey()) {
       try {
         const audioDataUrl = await this.elevenLabsTTS(shortScript);
         return buildResult("voice", "Generated narration audio via ElevenLabs.", {
@@ -324,11 +343,12 @@ Produce a scene-friendly script structure with practical pacing.`,
       ? (imageStep.payload.images[0] as { url?: string } | undefined)?.url
       : undefined;
 
-    if (env.RUNWAY_API_KEY && firstImage && firstImage.startsWith("http")) {
+    const runwayKey = this.getRunwayKey();
+    if (runwayKey && firstImage && firstImage.startsWith("http")) {
       const response = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${env.RUNWAY_API_KEY}`,
+          Authorization: `Bearer ${runwayKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -349,7 +369,7 @@ Produce a scene-friendly script structure with practical pacing.`,
     }
 
     return buildResult("video", "Prepared real-ready timeline package (video provider optional).", {
-      provider: env.RUNWAY_API_KEY ? "runway-fallback" : "timeline-only",
+      provider: runwayKey ? "runway-fallback" : "timeline-only",
       timeline: sections.map((section, index) => ({
         order: index + 1,
         section,

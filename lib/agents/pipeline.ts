@@ -1,13 +1,19 @@
 import type { AgentResult, BriefInput, PipelineResponse } from "@/lib/types";
 import { getAgentProvider } from "@/lib/agents/factory";
 import type { AgentProvider } from "@/lib/agents/provider";
+import type { ProviderKeys } from "@/lib/provider-keys";
+
+type PipelineOptions = {
+  providerKeys?: ProviderKeys;
+};
 
 export async function runSingleAgent(
   agent: AgentResult["agent"],
   brief: BriefInput,
-  previous?: AgentResult[]
+  previous?: AgentResult[],
+  options?: PipelineOptions
 ): Promise<AgentResult> {
-  const provider: AgentProvider = getAgentProvider();
+  const provider: AgentProvider = getAgentProvider(options?.providerKeys);
   if (agent === "prompt") {
     return provider.runPromptAgent(brief);
   }
@@ -35,8 +41,8 @@ export async function runSingleAgent(
   return provider.runVideoAgent(brief, storyStep, imageStep, voiceStep);
 }
 
-export async function runFullPipeline(brief: BriefInput): Promise<PipelineResponse> {
-  const provider: AgentProvider = getAgentProvider();
+export async function runFullPipeline(brief: BriefInput, options?: PipelineOptions): Promise<PipelineResponse> {
+  const provider: AgentProvider = getAgentProvider(options?.providerKeys);
   const steps: AgentResult[] = [];
 
   const promptStep = await provider.runPromptAgent(brief);

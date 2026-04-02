@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { parseJsonBody } from "@/lib/api";
 import { pipelineRequestSchema } from "@/lib/types";
 import { runFullPipeline } from "@/lib/agents/pipeline";
+import { readProviderKeysFromUser } from "@/lib/provider-keys";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assertUserCanAccessProject, persistAgentSteps } from "@/lib/workspace/service";
@@ -10,6 +12,17 @@ export async function POST(request: Request) {
   const parsed = await parseJsonBody(request, pipelineRequestSchema);
   if (!parsed.ok) {
     return parsed.response;
+  }
+
+  let providerKeys;
+  let authenticatedUser: User | null = null;
+  if (isSupabaseConfigured()) {
+    const supabase = await createSupabaseServerClient();
+    const authResult = await supabase.auth.getUser();
+    authenticatedUser = authResult.data.user;
+    if (authenticatedUser) {
+      providerKeys = readProviderKeysFromUser(authenticatedUser);
+    }
   }
 
   let workspaceSupabaseClient: Awaited<ReturnType<typeof createSupabaseServerClient>> | null = null;
@@ -40,12 +53,12 @@ export async function POST(request: Request) {
     }
   }
 
-  const result = await runFullPipeline(parsed.data.brief);
+  const result = await runFullPipeline(parsed.data.brief, { providerKeys });
 
   if (parsed.data.projectId && workspaceSupabaseClient) {
     try {
       const authResult = await workspaceSupabaseClient.auth.getUser();
-      const user = authResult.data.user;
+      const user = authResult.data.user ?? authenticatedUser;
       if (!user) {
         return NextResponse.json({ error: "Authentication required to save pipeline runs." }, { status: 401 });
       }

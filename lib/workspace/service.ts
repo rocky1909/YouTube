@@ -12,6 +12,7 @@ export type ProjectSummary = {
   created_at: string;
   updated_at?: string;
   last_run_at?: string;
+  latest_run?: AgentResult[];
 };
 
 export type WorkspaceContext = {
@@ -33,6 +34,7 @@ type SupabaseLikeError = {
 } | null;
 
 const METADATA_KEY = "ytStudio";
+const AGENT_ORDER: AgentResult["agent"][] = ["prompt", "story", "image", "voice", "video"];
 
 function fallbackWorkspaceName(email: string | null | undefined): string {
   if (!email) return "My Studio";
@@ -59,9 +61,19 @@ function asObject(value: unknown): Record<string, unknown> {
   return {};
 }
 
+function asAgentName(value: unknown): AgentResult["agent"] | null {
+  if (value === "prompt" || value === "story" || value === "image" || value === "voice" || value === "video") {
+    return value;
+  }
+  return null;
+}
+
 function normalizeProject(value: unknown): ProjectSummary {
   const now = new Date().toISOString();
   const objectValue = asObject(value);
+  const latestRunRaw = Array.isArray(objectValue.latest_run)
+    ? (objectValue.latest_run as AgentResult[])
+    : undefined;
   return {
     id: typeof objectValue.id === "string" ? objectValue.id : crypto.randomUUID(),
     title: typeof objectValue.title === "string" ? objectValue.title : "Episode draft",
@@ -75,7 +87,8 @@ function normalizeProject(value: unknown): ProjectSummary {
     status: typeof objectValue.status === "string" ? objectValue.status : "draft",
     created_at: typeof objectValue.created_at === "string" ? objectValue.created_at : now,
     updated_at: typeof objectValue.updated_at === "string" ? objectValue.updated_at : undefined,
-    last_run_at: typeof objectValue.last_run_at === "string" ? objectValue.last_run_at : undefined
+    last_run_at: typeof objectValue.last_run_at === "string" ? objectValue.last_run_at : undefined,
+    latest_run: latestRunRaw
   };
 }
 
@@ -230,11 +243,76 @@ export async function getOrCreateWorkspaceContext(
     throw new Error(projectsResult.error.message);
   }
 
+  const projects = (projectsResult.data ?? []) as ProjectSummary[];
+  if (projects.length === 0) {
+    return {
+      workspaceId,
+      workspaceName,
+      role,
+      projects,
+      storageMode: "database"
+    };
+  }
+
+  const projectIds = projects.map((project) => project.id);
+  const runsResult = await supabase
+    .from("agent_runs")
+    .select("project_id, agent_name, summary, payload, created_at")
+    .in("project_id", projectIds)
+    .order("created_at", { ascending: false });
+
+  const latestByProject = new Map<string, Map<AgentResult["agent"], AgentResult>>();
+  const latestRunAtByProject = new Map<string, string>();
+
+  if (!runsResult.error && Array.isArray(runsResult.data)) {
+    for (const row of runsResult.data) {
+      const rowObject = asObject(row);
+      const projectId = typeof rowObject.project_id === "string" ? rowObject.project_id : null;
+      const agent = asAgentName(rowObject.agent_name);
+      if (!projectId || !agent) continue;
+
+      if (!latestRunAtByProject.has(projectId) && typeof rowObject.created_at === "string") {
+        latestRunAtByProject.set(projectId, rowObject.created_at);
+      }
+
+      let byAgent = latestByProject.get(projectId);
+      if (!byAgent) {
+        byAgent = new Map<AgentResult["agent"], AgentResult>();
+        latestByProject.set(projectId, byAgent);
+      }
+      if (byAgent.has(agent)) {
+        continue;
+      }
+
+      byAgent.set(agent, {
+        agent,
+        summary: typeof rowObject.summary === "string" ? rowObject.summary : "Generated output",
+        payload: asObject(rowObject.payload),
+        generatedAt: typeof rowObject.created_at === "string" ? rowObject.created_at : new Date().toISOString()
+      });
+    }
+  }
+
+  const projectsWithRuns = projects.map((project) => {
+    const byAgent = latestByProject.get(project.id);
+    if (!byAgent || byAgent.size === 0) {
+      return project;
+    }
+    const latestRun = AGENT_ORDER.map((agent) => byAgent.get(agent)).filter(
+      (step): step is AgentResult => Boolean(step)
+    );
+    return {
+      ...project,
+      latest_run: latestRun,
+      last_run_at: latestRunAtByProject.get(project.id) ?? project.last_run_at
+    };
+  });
+
   return {
     workspaceId,
     workspaceName,
     role,
-    projects: (projectsResult.data ?? []) as ProjectSummary[],
+    projects: projectsWithRuns,
     storageMode: "database"
   };
 }
@@ -260,7 +338,8 @@ export async function createProjectForUserWorkspace(
     tone: input.tone,
     duration_minutes: input.durationMinutes,
     status: "draft",
-    created_at: now
+    created_at: now,
+    latest_run: []
   };
 
   if (context.storageMode === "metadata") {
@@ -386,7 +465,9 @@ export async function persistAgentSteps(
   await updateWorkspaceMetadata(supabase, user, (current) => ({
     workspaceName: current.workspaceName ?? fallbackWorkspaceName(user.email),
     projects: (current.projects ?? []).map((project) =>
-      project.id === projectId ? { ...project, status: "ready", last_run_at: now, updated_at: now } : project
+      project.id === projectId
+        ? { ...project, status: "ready", last_run_at: now, updated_at: now, latest_run: steps }
+        : project
     )
   }));
 }

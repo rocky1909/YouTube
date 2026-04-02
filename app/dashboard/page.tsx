@@ -3,6 +3,7 @@ import { AgentRunner } from "@/components/agent-runner";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOrCreateWorkspaceContext } from "@/lib/workspace/service";
+import type { AgentResult } from "@/lib/types";
 
 export default async function DashboardPage() {
   let workspaceContext:
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
           duration_minutes: number;
           status: string;
           created_at: string;
+          latest_run?: AgentResult[];
         }>;
       }
     | undefined;
