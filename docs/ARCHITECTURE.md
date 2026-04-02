@@ -5,6 +5,8 @@
 - Backend: Route handlers in `app/api/*`
 - Domain layer: `lib/agents/*`
 - Validation: Zod schemas in `lib/types.ts`
+- Auth + sessions: Supabase auth routes + server cookie client
+- Team data: Supabase service-role workspace/project persistence
 
 ## Why this fixes the missing part
 The earlier prototype pattern often fails by putting everything in one client file. This repo now separates:
@@ -12,6 +14,7 @@ The earlier prototype pattern often fails by putting everything in one client fi
 - API contract validation
 - agent orchestration logic
 - provider implementation details
+- auth and workspace persistence
 
 That makes it deployable and safe to extend for team use.
 

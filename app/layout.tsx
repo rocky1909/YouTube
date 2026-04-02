@@ -1,17 +1,6 @@
 import type { Metadata } from "next";
-import { Sora, Space_Grotesk } from "next/font/google";
 import { NavHeader } from "@/components/nav-header";
 import "./globals.css";
-
-const headingFont = Sora({
-  subsets: ["latin"],
-  variable: "--font-heading"
-});
-
-const bodyFont = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-body"
-});
 
 export const metadata: Metadata = {
   title: "YouTube Agentic Studio",
@@ -24,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${headingFont.variable} ${bodyFont.variable}`}>
-      <body style={{ fontFamily: "var(--font-body)" }}>
+    <html lang="en">
+      <body style={{ fontFamily: "Avenir Next, Manrope, Segoe UI, sans-serif" }}>
         <NavHeader />
         {children}
       </body>

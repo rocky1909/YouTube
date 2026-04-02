@@ -17,7 +17,8 @@ export const agentResultSchema = z.object({
 });
 
 export const pipelineRequestSchema = z.object({
-  brief: briefSchema
+  brief: briefSchema,
+  projectId: z.string().uuid().optional()
 });
 
 export type BriefInput = z.infer<typeof briefSchema>;

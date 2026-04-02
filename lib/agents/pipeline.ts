@@ -1,14 +1,13 @@
 import type { AgentResult, BriefInput, PipelineResponse } from "@/lib/types";
-import { MockAgentProvider } from "@/lib/agents/mock-provider";
+import { getAgentProvider } from "@/lib/agents/factory";
 import type { AgentProvider } from "@/lib/agents/provider";
-
-const provider: AgentProvider = new MockAgentProvider();
 
 export async function runSingleAgent(
   agent: AgentResult["agent"],
   brief: BriefInput,
   previous?: AgentResult[]
 ): Promise<AgentResult> {
+  const provider: AgentProvider = getAgentProvider();
   if (agent === "prompt") {
     return provider.runPromptAgent(brief);
   }
@@ -37,6 +36,7 @@ export async function runSingleAgent(
 }
 
 export async function runFullPipeline(brief: BriefInput): Promise<PipelineResponse> {
+  const provider: AgentProvider = getAgentProvider();
   const steps: AgentResult[] = [];
 
   const promptStep = await provider.runPromptAgent(brief);

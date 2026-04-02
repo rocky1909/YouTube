@@ -4,6 +4,22 @@ import { FormEvent, useMemo, useState } from "react";
 import type { AgentName, AgentResult, BriefInput } from "@/lib/types";
 
 type StepState = "idle" | "running" | "done" | "error";
+type WorkspaceProject = {
+  id: string;
+  title: string;
+  topic: string;
+  audience: string;
+  tone: string;
+  duration_minutes: number;
+  status: string;
+  created_at: string;
+};
+
+type WorkspaceContext = {
+  workspaceName: string;
+  userEmail: string;
+  projects: WorkspaceProject[];
+};
 
 const orderedAgents: AgentName[] = ["prompt", "story", "image", "voice", "video"];
 
@@ -37,9 +53,12 @@ function stateClasses(state: StepState): string {
   return "text-paper/70 border-paper/20 bg-paper/5";
 }
 
-export function AgentRunner() {
+export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
   const [brief, setBrief] = useState<BriefInput>(defaultBrief);
   const [steps, setSteps] = useState<AgentResult[]>([]);
+  const [projects, setProjects] = useState<WorkspaceProject[]>(workspace?.projects ?? []);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(workspace?.projects?.[0]?.id ?? "");
+  const [newProjectTitle, setNewProjectTitle] = useState("Episode draft");
   const [status, setStatus] = useState<Record<AgentName, StepState>>({
     prompt: "idle",
     story: "idle",
@@ -48,6 +67,7 @@ export function AgentRunner() {
     video: "idle"
   });
   const [error, setError] = useState<string | null>(null);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [runningAll, setRunningAll] = useState(false);
 
   const completedCount = useMemo(
@@ -74,7 +94,7 @@ export function AgentRunner() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ brief, previous: steps })
+        body: JSON.stringify({ brief, previous: steps, projectId: selectedProjectId || undefined })
       });
       const json = (await response.json()) as { step?: AgentResult; error?: string };
       if (!response.ok || !json.step) {
@@ -106,7 +126,7 @@ export function AgentRunner() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ brief })
+        body: JSON.stringify({ brief, projectId: selectedProjectId || undefined })
       });
       const json = (await response.json()) as { steps?: AgentResult[]; error?: string };
       if (!response.ok || !Array.isArray(json.steps)) {
@@ -135,9 +155,78 @@ export function AgentRunner() {
     }
   };
 
+  const createProject = async () => {
+    setWorkspaceError(null);
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title: newProjectTitle,
+          topic: brief.topic,
+          audience: brief.audience,
+          tone: brief.tone,
+          durationMinutes: brief.durationMinutes
+        })
+      });
+      const json = (await response.json()) as { project?: WorkspaceProject; error?: string };
+      if (!response.ok || !json.project) {
+        throw new Error(json.error ?? "Failed to create project.");
+      }
+
+      setProjects((current) => [json.project as WorkspaceProject, ...current]);
+      setSelectedProjectId(json.project.id);
+      setNewProjectTitle(`${brief.topic.slice(0, 32)} episode`);
+    } catch (caught) {
+      setWorkspaceError(caught instanceof Error ? caught.message : "Failed to create project.");
+    }
+  };
+
   return (
     <section className="space-y-6">
       <form onSubmit={runAll} className="glass-card rounded-3xl p-5 sm:p-6">
+        <div className="mb-4 rounded-2xl border border-paper/15 bg-black/15 p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-paper/55">
+            {workspace ? "Team Workspace Mode" : "Standalone Mode"}
+          </p>
+          {workspace ? (
+            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+              <select
+                value={selectedProjectId}
+                onChange={(event) => setSelectedProjectId(event.target.value)}
+                className="rounded-xl border border-paper/20 bg-black/25 px-3 py-2 text-paper outline-none focus:border-lagoon/60"
+              >
+                <option value="">Select project</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.title} ({project.status})
+                  </option>
+                ))}
+              </select>
+              <input
+                value={newProjectTitle}
+                onChange={(event) => setNewProjectTitle(event.target.value)}
+                className="rounded-xl border border-paper/20 bg-black/25 px-3 py-2 text-paper outline-none focus:border-lagoon/60"
+                placeholder="New project title"
+              />
+              <button
+                type="button"
+                onClick={createProject}
+                className="rounded-xl border border-paper/20 px-3 py-2 text-sm text-paper transition hover:bg-paper/5"
+              >
+                Create project
+              </button>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-paper/70">
+              Configure Supabase and sign in to unlock team workspace and project persistence.
+            </p>
+          )}
+          {workspaceError ? <p className="mt-2 text-sm text-coral">{workspaceError}</p> : null}
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm">
             <span className="mb-1 block text-paper/70">Video Topic</span>
@@ -192,6 +281,11 @@ export function AgentRunner() {
           <div className="rounded-xl border border-paper/20 px-3 py-2 text-sm text-paper/75">
             Completed {completedCount} / {orderedAgents.length} agents
           </div>
+          {selectedProjectId ? (
+            <div className="rounded-xl border border-lagoon/40 bg-lagoon/10 px-3 py-2 text-sm text-paper/85">
+              Saving runs to selected project
+            </div>
+          ) : null}
           {error ? <p className="text-sm text-coral">{error}</p> : null}
         </div>
       </form>
