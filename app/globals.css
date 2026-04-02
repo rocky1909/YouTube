@@ -19,6 +19,7 @@ body {
     radial-gradient(700px 500px at 35% 95%, rgba(63, 108, 81, 0.2), transparent 65%),
     #070b1a;
   color: #f3f1eb;
+  overflow-x: hidden;
 }
 
 a {
@@ -27,8 +28,14 @@ a {
 }
 
 .app-shell {
-  width: min(1200px, calc(100% - 2.5rem));
+  width: min(1200px, calc(100% - 2rem));
   margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: min(1200px, calc(100% - 1rem));
+  }
 }
 
 .glass-card {

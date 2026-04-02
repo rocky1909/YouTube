@@ -192,11 +192,11 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
             {workspace ? "Team Workspace Mode" : "Standalone Mode"}
           </p>
           {workspace ? (
-            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_minmax(220px,1fr)_auto]">
               <select
                 value={selectedProjectId}
                 onChange={(event) => setSelectedProjectId(event.target.value)}
-                className="rounded-xl border border-paper/20 bg-black/25 px-3 py-2 text-paper outline-none focus:border-lagoon/60"
+                className="min-w-0 rounded-xl border border-paper/20 bg-black/25 px-3 py-2 text-paper outline-none focus:border-lagoon/60"
               >
                 <option value="">Select project</option>
                 {projects.map((project) => (
@@ -208,13 +208,13 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
               <input
                 value={newProjectTitle}
                 onChange={(event) => setNewProjectTitle(event.target.value)}
-                className="rounded-xl border border-paper/20 bg-black/25 px-3 py-2 text-paper outline-none focus:border-lagoon/60"
+                className="min-w-0 rounded-xl border border-paper/20 bg-black/25 px-3 py-2 text-paper outline-none focus:border-lagoon/60"
                 placeholder="New project title"
               />
               <button
                 type="button"
                 onClick={createProject}
-                className="rounded-xl border border-paper/20 px-3 py-2 text-sm text-paper transition hover:bg-paper/5"
+                className="rounded-xl border border-paper/20 px-3 py-2 text-sm text-paper transition hover:bg-paper/5 lg:px-4"
               >
                 Create project
               </button>
@@ -274,19 +274,19 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
           <button
             type="submit"
             disabled={runningAll}
-            className="rounded-xl bg-paper px-4 py-2 text-sm font-semibold text-night transition hover:translate-y-[-1px] disabled:opacity-60"
+            className="w-full rounded-xl bg-paper px-4 py-2 text-sm font-semibold text-night transition hover:translate-y-[-1px] disabled:opacity-60 sm:w-auto"
           >
             {runningAll ? "Running full pipeline..." : "Run Full Pipeline"}
           </button>
-          <div className="rounded-xl border border-paper/20 px-3 py-2 text-sm text-paper/75">
+          <div className="w-full rounded-xl border border-paper/20 px-3 py-2 text-sm text-paper/75 sm:w-auto">
             Completed {completedCount} / {orderedAgents.length} agents
           </div>
           {selectedProjectId ? (
-            <div className="rounded-xl border border-lagoon/40 bg-lagoon/10 px-3 py-2 text-sm text-paper/85">
+            <div className="w-full rounded-xl border border-lagoon/40 bg-lagoon/10 px-3 py-2 text-sm text-paper/85 sm:w-auto">
               Saving runs to selected project
             </div>
           ) : null}
-          {error ? <p className="text-sm text-coral">{error}</p> : null}
+          {error ? <p className="w-full text-sm text-coral">{error}</p> : null}
         </div>
       </form>
 
@@ -295,8 +295,8 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
           const result = steps.find((step) => step.agent === agent);
           return (
             <article key={agent} className="glass-card rounded-3xl p-5">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-lg font-semibold text-paper">{labels[agent]}</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-semibold text-paper sm:text-lg">{labels[agent]}</h3>
                 <span className={`rounded-full border px-2.5 py-1 text-xs ${stateClasses(status[agent])}`}>
                   {status[agent]}
                 </span>
@@ -304,7 +304,7 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
               <p className="mt-2 text-sm text-paper/70">
                 {result?.summary ?? "Not run yet. Use Run Full Pipeline or run this agent alone."}
               </p>
-              <div className="mt-4 flex items-center justify-between">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => runSingle(agent)}
@@ -313,9 +313,11 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
                 >
                   {status[agent] === "running" ? "Running..." : "Run agent"}
                 </button>
-                <span className="text-xs text-paper/50">{result?.generatedAt ? new Date(result.generatedAt).toLocaleTimeString() : "No output"}</span>
+                <span className="text-xs text-paper/50">
+                  {result?.generatedAt ? new Date(result.generatedAt).toLocaleTimeString() : "No output"}
+                </span>
               </div>
-              <pre className="mt-3 max-h-48 overflow-auto rounded-xl border border-white/10 bg-black/25 p-3 text-xs text-paper/75">
+              <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-white/10 bg-black/25 p-3 text-xs text-paper/75">
                 {JSON.stringify(result?.payload ?? {}, null, 2)}
               </pre>
             </article>

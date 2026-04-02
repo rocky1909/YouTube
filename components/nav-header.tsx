@@ -18,22 +18,22 @@ export async function NavHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070b1acc] backdrop-blur">
-      <div className="app-shell flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
+      <div className="app-shell flex flex-col gap-3 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:py-0">
+        <Link href="/" className="flex w-full items-center gap-3 sm:w-auto">
           <div className="pulse-dot h-8 w-8 rounded-full bg-coral text-coral" />
-          <div>
-            <p className="text-sm font-semibold tracking-[0.15em] text-paper/95">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold tracking-[0.12em] text-paper/95 sm:text-sm sm:tracking-[0.15em]">
               YOUTUBE AGENTIC STUDIO
             </p>
-            <p className="text-xs text-paper/60">Prompt to publish assistant</p>
+            <p className="hidden text-xs text-paper/60 sm:block">Prompt to publish assistant</p>
           </div>
         </Link>
-        <nav className="flex items-center gap-2">
+        <nav className="flex w-full items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:overflow-visible sm:pb-0">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-paper/85 transition hover:border-white/30 hover:bg-white/5"
+              className="whitespace-nowrap rounded-full border border-white/10 px-3 py-1.5 text-sm text-paper/85 transition hover:border-white/30 hover:bg-white/5"
             >
               {link.label}
             </Link>
@@ -43,7 +43,7 @@ export async function NavHeader() {
               <form action="/api/auth/logout" method="post">
                 <button
                   type="submit"
-                  className="rounded-full border border-coral/40 px-3 py-1.5 text-sm text-paper transition hover:bg-coral/20"
+                  className="whitespace-nowrap rounded-full border border-coral/40 px-3 py-1.5 text-sm text-paper transition hover:bg-coral/20"
                 >
                   Logout
                 </button>
@@ -51,7 +51,7 @@ export async function NavHeader() {
             ) : (
               <Link
                 href="/auth/login"
-                className="rounded-full border border-lagoon/40 px-3 py-1.5 text-sm text-paper transition hover:bg-lagoon/20"
+                className="whitespace-nowrap rounded-full border border-lagoon/40 px-3 py-1.5 text-sm text-paper transition hover:bg-lagoon/20"
               >
                 Login
               </Link>
