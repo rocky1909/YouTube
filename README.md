@@ -79,6 +79,10 @@ Required for auth/workspaces:
 Optional Supabase admin key:
 - `SUPABASE_SERVICE_ROLE_KEY`
 
+Automatic setup behavior:
+- If workspace tables are missing, the app automatically falls back to Supabase Auth metadata storage.
+- You can still run `supabase/schema.sql` later to switch to full table-based persistence.
+
 Optional for real provider generation:
 - `OPENAI_API_KEY`
 - `ELEVENLABS_API_KEY`

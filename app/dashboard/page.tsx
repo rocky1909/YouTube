@@ -32,10 +32,7 @@ export default async function DashboardPage() {
     }
 
     try {
-      const context = await getOrCreateWorkspaceContext(supabase, {
-        id: user.id,
-        email: user.email ?? ""
-      });
+      const context = await getOrCreateWorkspaceContext(supabase, user);
 
       workspaceContext = {
         workspaceName: context.workspaceName,

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      await assertUserCanAccessProject(supabase, user.id, parsed.data.projectId);
+      await assertUserCanAccessProject(supabase, user.id, parsed.data.projectId, user);
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "You do not have access to this project." },
@@ -44,7 +44,12 @@ export async function POST(request: Request) {
 
   if (parsed.data.projectId && workspaceSupabaseClient) {
     try {
-      await persistAgentSteps(workspaceSupabaseClient, parsed.data.projectId, result.steps);
+      const authResult = await workspaceSupabaseClient.auth.getUser();
+      const user = authResult.data.user;
+      if (!user) {
+        return NextResponse.json({ error: "Authentication required to save pipeline runs." }, { status: 401 });
+      }
+      await persistAgentSteps(workspaceSupabaseClient, user, parsed.data.projectId, result.steps);
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Failed to persist pipeline run." },

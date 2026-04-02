@@ -7,6 +7,7 @@
 - Validation: Zod schemas in `lib/types.ts`
 - Auth + sessions: Supabase auth routes + server cookie client
 - Team data: Supabase authenticated session workspace/project persistence
+- Auto-fallback: when workspace tables are absent, store workspace/project metadata in Supabase Auth user metadata
 
 ## Why this fixes the missing part
 The earlier prototype pattern often fails by putting everything in one client file. This repo now separates:
