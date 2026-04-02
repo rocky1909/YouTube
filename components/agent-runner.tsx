@@ -13,6 +13,8 @@ type WorkspaceProject = {
   duration_minutes: number;
   status: string;
   created_at: string;
+  updated_at?: string;
+  last_run_at?: string;
   latest_run?: AgentResult[];
 };
 
@@ -157,6 +159,30 @@ function formatRunTime(value: string | undefined): string {
   return date.toLocaleString();
 }
 
+function mergeLocalSteps(current: AgentResult[] | undefined, incoming: AgentResult[]): AgentResult[] {
+  const byAgent = new Map<AgentName, AgentResult>();
+  for (const step of current ?? []) {
+    byAgent.set(step.agent, step);
+  }
+  for (const step of incoming) {
+    byAgent.set(step.agent, step);
+  }
+  return orderedAgents.map((agent) => byAgent.get(agent)).filter((step): step is AgentResult => Boolean(step));
+}
+
+function projectLastGeneratedAt(project: WorkspaceProject): string | undefined {
+  if (project.last_run_at) return project.last_run_at;
+  const generated = (project.latest_run ?? [])
+    .map((step) => {
+      const time = new Date(step.generatedAt).getTime();
+      return Number.isNaN(time) ? null : time;
+    })
+    .filter((value): value is number => value !== null);
+
+  if (generated.length === 0) return undefined;
+  return new Date(Math.max(...generated)).toISOString();
+}
+
 export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
   const [brief, setBrief] = useState<BriefInput>(defaultBrief);
   const [steps, setSteps] = useState<AgentResult[]>([]);
@@ -205,7 +231,12 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
   };
 
   useEffect(() => {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId) {
+      setSteps([]);
+      setStatus({ ...idleStatus });
+      setError(null);
+      return;
+    }
     const saved = selectedProject?.latest_run;
     if (Array.isArray(saved) && saved.length > 0) {
       setSteps(saved);
@@ -265,8 +296,25 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
       if (!response.ok || !json.step) {
         throw new Error(json.error ?? `Failed to run ${agent} agent.`);
       }
-      updateStep(json.step);
+      const nextStep = json.step;
+      updateStep(nextStep);
       setStatus((current) => ({ ...current, [agent]: "done" }));
+      if (selectedProjectId) {
+        const now = new Date().toISOString();
+        setProjects((current) =>
+          current.map((project) =>
+            project.id === selectedProjectId
+              ? {
+                  ...project,
+                  status: "ready",
+                  updated_at: now,
+                  last_run_at: now,
+                  latest_run: mergeLocalSteps(project.latest_run, [nextStep])
+                }
+              : project
+          )
+        );
+      }
     } catch (caught) {
       setStatus((current) => ({ ...current, [agent]: "error" }));
       setError(caught instanceof Error ? caught.message : "Unexpected pipeline error.");
@@ -291,8 +339,9 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
       if (!response.ok || !Array.isArray(json.steps)) {
         throw new Error(json.error ?? "Failed to run full pipeline.");
       }
+      const nextSteps = json.steps;
 
-      setSteps(json.steps);
+      setSteps(nextSteps);
       setStatus({
         prompt: "done",
         story: "done",
@@ -308,8 +357,10 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
               ? {
                   ...project,
                   status: "ready",
-                  latest_run: json.steps,
-                  created_at: project.created_at ?? now
+                  latest_run: mergeLocalSteps(project.latest_run, nextSteps),
+                  created_at: project.created_at ?? now,
+                  updated_at: now,
+                  last_run_at: now
                 }
               : project
           )
@@ -343,9 +394,10 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
       if (!response.ok || !json.project) {
         throw new Error(json.error ?? "Failed to create project.");
       }
+      const createdProject = json.project;
 
-      setProjects((current) => [json.project as WorkspaceProject, ...current]);
-      setSelectedProjectId(json.project.id);
+      setProjects((current) => [createdProject, ...current]);
+      setSelectedProjectId(createdProject.id);
       setNewProjectTitle(`${brief.topic.slice(0, 32)} episode`);
     } catch (caught) {
       setWorkspaceError(caught instanceof Error ? caught.message : "Failed to create project.");
@@ -400,6 +452,7 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
 
   const titleOptions = useMemo(() => readStringArray(promptOutput?.payload.titleOptions), [promptOutput]);
   const hookLine = toOptionalString(promptOutput?.payload.hookLine);
+  const storySections = useMemo(() => readStringArray(storyOutput?.payload.sections), [storyOutput]);
   const voiceScript = toOptionalString(voiceOutput?.payload.scriptSample);
   const voiceAudioUrl = toOptionalString(voiceOutput?.payload.audioDataUrl);
   const imageScenes = useMemo(() => readImageScenes(imageOutput?.payload.images), [imageOutput]);
@@ -474,6 +527,16 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
           {workspaceError ? <p className="mt-2 text-sm text-coral">{workspaceError}</p> : null}
         </div>
 
+        <div className="mb-4 rounded-2xl border border-lagoon/30 bg-lagoon/10 p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-paper/60">How to use</p>
+          <p className="mt-2 text-sm text-paper/85">
+            1. Add API keys in Provider Keys. 2. Create/select a project. 3. Run the full pipeline.
+          </p>
+          <p className="mt-1 text-xs text-paper/65">
+            Generated assets appear in Generated Output and are saved under the selected project.
+          </p>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm">
             <span className="mb-1 block text-paper/70">Video Topic</span>
@@ -536,6 +599,56 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
           {error ? <p className="w-full text-sm text-coral">{error}</p> : null}
         </div>
       </form>
+
+      {workspace ? (
+        <section className="glass-card rounded-3xl p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-paper/55">Project Library</p>
+              <h2 className="mt-1 text-xl font-semibold text-paper">Created Projects</h2>
+            </div>
+            <p className="text-sm text-paper/70">
+              Select a project to load its latest generated output.
+            </p>
+          </div>
+
+          {projects.length === 0 ? (
+            <p className="mt-4 rounded-xl border border-paper/15 bg-black/20 p-3 text-sm text-paper/70">
+              No projects yet. Create one from the top section.
+            </p>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {projects.map((project) => {
+                const isSelected = selectedProjectId === project.id;
+                const latestRunTime = projectLastGeneratedAt(project);
+                return (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => setSelectedProjectId(project.id)}
+                    className={`rounded-2xl border p-3 text-left transition ${
+                      isSelected
+                        ? "border-lagoon/45 bg-lagoon/15"
+                        : "border-paper/15 bg-black/20 hover:border-paper/30 hover:bg-black/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-paper">{project.title}</p>
+                      <span className={`rounded-full border px-2 py-0.5 text-xs ${stateClasses(isSelected ? "done" : "idle")}`}>
+                        {project.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-paper/70">{project.topic}</p>
+                    <p className="mt-2 text-xs text-paper/60">
+                      Outputs: {(project.latest_run ?? []).length} | Last run: {formatRunTime(latestRunTime)}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <section className="glass-card rounded-3xl p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -620,16 +733,14 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
           <button
             type="button"
             onClick={saveProviderKeys}
-            disabled={providerBusy || !workspace}
+            disabled={providerBusy}
             className="rounded-xl border border-paper/20 px-4 py-2 text-sm text-paper transition hover:bg-paper/5 disabled:opacity-60"
           >
             {providerBusy ? "Saving..." : "Save Provider Keys"}
           </button>
-          {workspace ? (
-            <p className="text-sm text-paper/65">Keys are saved to your signed-in account metadata.</p>
-          ) : (
-            <p className="text-sm text-paper/65">Sign in with Supabase to save per-user keys.</p>
-          )}
+          <p className="text-sm text-paper/65">
+            Keys are saved to your signed-in account when Supabase auth is active.
+          </p>
           {providerMessage ? <p className={`w-full text-sm ${statusTone(providerMessage)}`}>{providerMessage}</p> : null}
         </div>
       </section>
@@ -641,6 +752,11 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
             <h2 className="mt-1 text-xl font-semibold text-paper">
               {selectedProject ? selectedProject.title : "Current Pipeline Run"}
             </h2>
+            {selectedProject ? (
+              <p className="mt-1 text-xs text-paper/65">
+                Last run: {formatRunTime(projectLastGeneratedAt(selectedProject))}
+              </p>
+            ) : null}
           </div>
           <p className="max-w-lg text-sm text-paper/70">
             Your generated project assets appear here: title + script, images, voice sample, and video plan.
@@ -663,6 +779,11 @@ export function AgentRunner({ workspace }: { workspace?: WorkspaceContext }) {
               {hookLine ? (
                 <p className="mt-1 text-sm text-paper/90">
                   <span className="text-paper/65">Hook:</span> {hookLine}
+                </p>
+              ) : null}
+              {storySections.length > 0 ? (
+                <p className="mt-1 text-xs text-paper/70">
+                  Story sections: {storySections.slice(0, 4).join(" | ")}
                 </p>
               ) : null}
               {storyOutput ? (

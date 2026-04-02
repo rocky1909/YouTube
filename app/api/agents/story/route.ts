@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/api";
-import { runSingleAgent } from "@/lib/agents/pipeline";
-import { readProviderKeysFromUser } from "@/lib/provider-keys";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { runAgentWithOptionalPersistence } from "@/lib/agents/route-runner";
 import { agentResultSchema, briefSchema } from "@/lib/types";
 
 const requestSchema = z.object({
   brief: briefSchema,
-  previous: z.array(agentResultSchema).optional()
+  previous: z.array(agentResultSchema).optional(),
+  projectId: z.string().uuid().optional()
 });
 
 export async function POST(request: Request) {
@@ -18,16 +16,25 @@ export async function POST(request: Request) {
     return parsed.response;
   }
 
-  let providerKeys;
-  if (isSupabaseConfigured()) {
-    const supabase = await createSupabaseServerClient();
-    const authResult = await supabase.auth.getUser();
-    const user = authResult.data.user;
-    if (user) {
-      providerKeys = readProviderKeysFromUser(user);
+  try {
+    const result = await runAgentWithOptionalPersistence({
+      agent: "story",
+      brief: parsed.data.brief,
+      previous: parsed.data.previous,
+      projectId: parsed.data.projectId
+    });
+    return NextResponse.json({ step: result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to run story agent.";
+    if (message.toLowerCase().includes("authentication required")) {
+      return NextResponse.json({ error: message }, { status: 401 });
     }
+    if (message.toLowerCase().includes("access")) {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+    if (message.toLowerCase().includes("must be configured")) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const result = await runSingleAgent("story", parsed.data.brief, parsed.data.previous, { providerKeys });
-  return NextResponse.json({ step: result });
 }

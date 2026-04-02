@@ -68,6 +68,19 @@ function asAgentName(value: unknown): AgentResult["agent"] | null {
   return null;
 }
 
+function mergeAgentSteps(existing: AgentResult[] | undefined, incoming: AgentResult[]): AgentResult[] {
+  const byAgent = new Map<AgentResult["agent"], AgentResult>();
+
+  for (const step of existing ?? []) {
+    byAgent.set(step.agent, step);
+  }
+  for (const step of incoming) {
+    byAgent.set(step.agent, step);
+  }
+
+  return AGENT_ORDER.map((agent) => byAgent.get(agent)).filter((step): step is AgentResult => Boolean(step));
+}
+
 function normalizeProject(value: unknown): ProjectSummary {
   const now = new Date().toISOString();
   const objectValue = asObject(value);
@@ -466,7 +479,13 @@ export async function persistAgentSteps(
     workspaceName: current.workspaceName ?? fallbackWorkspaceName(user.email),
     projects: (current.projects ?? []).map((project) =>
       project.id === projectId
-        ? { ...project, status: "ready", last_run_at: now, updated_at: now, latest_run: steps }
+        ? {
+            ...project,
+            status: "ready",
+            last_run_at: now,
+            updated_at: now,
+            latest_run: mergeAgentSteps(project.latest_run, steps)
+          }
         : project
     )
   }));

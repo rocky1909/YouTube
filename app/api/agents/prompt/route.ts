@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/api";
-import { runSingleAgent } from "@/lib/agents/pipeline";
-import { readProviderKeysFromUser } from "@/lib/provider-keys";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { runAgentWithOptionalPersistence } from "@/lib/agents/route-runner";
 import { briefSchema } from "@/lib/types";
 
 const requestSchema = z.object({
-  brief: briefSchema
+  brief: briefSchema,
+  projectId: z.string().uuid().optional()
 });
 
 export async function POST(request: Request) {
@@ -17,16 +15,24 @@ export async function POST(request: Request) {
     return parsed.response;
   }
 
-  let providerKeys;
-  if (isSupabaseConfigured()) {
-    const supabase = await createSupabaseServerClient();
-    const authResult = await supabase.auth.getUser();
-    const user = authResult.data.user;
-    if (user) {
-      providerKeys = readProviderKeysFromUser(user);
+  try {
+    const result = await runAgentWithOptionalPersistence({
+      agent: "prompt",
+      brief: parsed.data.brief,
+      projectId: parsed.data.projectId
+    });
+    return NextResponse.json({ step: result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to run prompt agent.";
+    if (message.toLowerCase().includes("authentication required")) {
+      return NextResponse.json({ error: message }, { status: 401 });
     }
+    if (message.toLowerCase().includes("access")) {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
+    if (message.toLowerCase().includes("must be configured")) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const result = await runSingleAgent("prompt", parsed.data.brief, undefined, { providerKeys });
-  return NextResponse.json({ step: result });
 }
